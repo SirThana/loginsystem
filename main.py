@@ -5,9 +5,11 @@ from flask import *
 from flask_wtf import *
 import pdb
 
+#TODO
+#   1.  Clean up the code, remove uneccesary functions
 
 
-
+#Default variables
 app = Flask(__name__, static_folder="static")
 
 
@@ -45,29 +47,30 @@ def queryDB(dbconnection, query):
                 cursor.execute(query)
                 query = cursor.fetchone()
                 dbconnection.commit()
+                return query
+        except Exception as e:
+            print(e)
+            return False
+
+
+    else:
+        try:
+            with dbconnection.cursor() as cursor:
+                cursor.execute(query)
+                query = cursor.fetchall()
                 return query;
         except Exception as e:
             print(e)
             return False
 
-    try:
-        with dbconnection.cursor() as cursor:
-            cursor.execute(query)
-            query = cursor.fetchall()
-            return query;
-    except Exception as e:
-        print(e)
-        return False
-
-
 @app.route('/handle_data', methods=['POST'])
 def handle_data():
-    #pdb.set_trace()
     if request.method == "POST":
         query = request.form #query returns a multiDict, with a key of projectFilepath
         x = selectQuery(query['projectFilepath']) #Calling for the object at ^^^^^^^^ 
-        return x #returns the result of the selectQuery with input ^^^^^
-    else:
+        x = x.strip()
+        return render_template('handler.html', name='Handler', data=x)
+    else: 
         return None
 
 
