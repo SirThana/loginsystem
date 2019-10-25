@@ -15,6 +15,12 @@
 <body>
 
 
+<form action="{{ url_for('handle_data') }}" method="POST">
+	<input type="text" name="query">
+	<input type="submit" value="E-Mail">
+</form>
+
+
 <form method="get" action="/">
     <button type="submit">Back</button>
 </form>

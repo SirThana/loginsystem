@@ -11,7 +11,7 @@ import pdb
 
 #Default variables
 app = Flask(__name__, static_folder="static")
-
+app.secret_key = b'_5#y2L"F4Q8z\n\xec]/'
 
 #   --> return a database connection
 def initConnection(user, password, db):
@@ -26,7 +26,7 @@ def initConnection(user, password, db):
 def selectQuery(userName):
     dbconnection = initConnection('db1', 'password', 'db')
     query = "SELECT * FROM Users WHERE {}=\'{}'"
-    field = 'FirstName'
+    field = 'Email'
     query = query.format(field,userName)
     try:
         with dbconnection.cursor() as cursor:
@@ -67,11 +67,14 @@ def queryDB(dbconnection, query):
 def handle_data():
     if request.method == "POST":
         query = request.form #query returns a multiDict, with a key of projectFilepath
-        x = selectQuery(query['projectFilepath']) #Calling for the object at ^^^^^^^^ 
-        x = x.strip()
-        return render_template('handler.html', name='Handler', data=x)
-    else: 
-        return None
+        x = selectQuery(query['query']) #Calling for the object at ^^^^^^^^ 
+        if x == 'None':
+            x = 'Bad E-Mail'
+            print(x)
+            flash('badEmail')
+            return redirect("/")
+        else:
+            return render_template('handler.html', name='Handler', data=x)
 
 
 

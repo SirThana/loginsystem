@@ -17,9 +17,22 @@
 
 <form action="{{ url_for('handle_data') }}" method="POST">
     <input type="text" name="query">
-    <input type="submit">
+    <input type="submit" value="E-Mail">
 </form>
 
+{% with messages = get_flashed_messages() %}
+  {% if messages %}
+    <ul class=flashes>
+    {% for message in messages %}
+      <li>{{ message }}</li>
+    {% endfor %}
+    </ul>
+  {% endif %}
+{% endwith %}
+{% block body %}{% endblock %}
+
+
+<p>{{data}}</p>
 
 </body>
 
