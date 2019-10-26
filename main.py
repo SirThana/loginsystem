@@ -7,7 +7,17 @@ import pdb
 
 #TODO
 #   1.  Clean up the code, remove uneccesary functions
+#   2.  Make selectQuery returnn a dict instead, easier to parse data from that over a string
 
+#REMINDER
+#   I left off at retrieving username and password from the fields, right now
+#   i can get those values, when i read this, i should probably make some logic
+#   that checks if the input of the user exists in the database, if so
+#   check_hash_somethingsomething password against that of the database,
+#   if both hashes are the same, we shouldd probably write a cookie to the user
+#   after that we can let the user retrieve some data from the database and check
+#   the cookie against the one held in memory, if they're the same, allow the user
+#   to retrieve his data from the database << something like this, figure it out tomorrow def_handl
 
 #Flask variables
 app = Flask(__name__, static_folder="static")
@@ -32,7 +42,7 @@ def selectQuery(value, field):
         with dbconnection.cursor() as cursor:
             cursor.execute(query)
             result = cursor.fetchone()
-            return str(result)
+            return str(result) #make this return some kinda dict maybe ??
 
     except Exception as e:
         print(e)
@@ -53,30 +63,32 @@ def queryDB(dbconnection, query):
 
 @app.route("/cookies")
 def cookies(ID):
-    res = make_response(render_template("/index.html"))
+    res = make_response(render_template("/index.html")) #preset, so we can mutate it and return
     #res.set_cookie("flavor", "Chocolate chip", max_age=10, expires=None, path=request.path,
             #domain=None, secure=False, httponly=False,  samesite=False)
 
-    res.set_cookie("ID", ID)
+    res.set_cookie("ID", ID) #cookies are like dicts
     cookie = request.cookies #retrieve all cookies from user
-    print("\n\n\n", "||||||||")
     print(cookie.get("ID")) #Get the cookie with a key of ID (cookies are dicts)
-    print(" ||||||||")
     return res
 
 
 @app.route('/handle_data', methods=['POST'])
 def handle_data():
-    if request.method == "POST":
-        input = request.form #input from any form, as multi dict (key query for value)
-        if input["query"] == "Test":
-            x = 5 # << this would be a select query 
-            return cookies(str(x)) #You can return cookie functionality without routing there!
-        if input["query"] == '': #<< write logic if a query returns False || None
-            flash('Bad Credentials')
-            return redirect("/")
-        else:
-            return render_template('index.html', name='Home')
+    #Retrieve values from forms here
+    input = request.form #input from any form, as multi dict (key query for value)
+    username = selectQuery(input['username'], "Firstname") #query username in the field Firstname
+    passwordHash = generate_password_hash(input['password'])
+    print("\n\n",username, password)
+
+    if input['username'] == username:
+        x = 5 # << this would be a select query 
+        return cookies(str(x)) #You can return cookie functionality without routing there!
+    if input["username"] == 'None': #<< write logic if a query returns False || None
+        flash('Bad Credentials')
+        return redirect("/")
+    else:
+        return render_template('index.html', name='Home')
 
 
 #   --> Home route
