@@ -1,23 +1,25 @@
 from werkzeug import *
-import pymysql
-import time
 from flask import *
-from flask_wtf import *
+import pymysql
+import random
+#-----------------
+import time
 import pdb
 
 #TODO
 #   1.  Clean up the code, remove uneccesary functions
-#   2.  Make selectQuery returnn a dict instead, easier to parse data from that over a string
+#   2.  Make selectQuery returnn a dict instead, easier to parse data from that over a string |Done
 
-#REMINDER
-#   I left off at retrieving username and password from the fields, right now
-#   i can get those values, when i read this, i should probably make some logic
-#   that checks if the input of the user exists in the database, if so
-#   check_hash_somethingsomething password against that of the database,
-#   if both hashes are the same, we shouldd probably write a cookie to the user
-#   after that we can let the user retrieve some data from the database and check
-#   the cookie against the one held in memory, if they're the same, allow the user
-#   to retrieve his data from the database << something like this, figure it out tomorrow def_handl
+
+#UPTOSPEED
+#   I can now authenticate users, when they logged in succesfully, i write a cookie to their
+#   web-storage, and to my database, i should write some logic that, after every action
+#   that requires authentication (maybe looking up data in the database specific to a user)
+#   read the cookie from the web-storage, read the cookie that matches web-storage[50] in my
+#   database, if they both match, the user has proved itself in this websession to be who he says
+#   he is. so look at he web-cookie[50], join that id with whatever data he wants to retrieve
+#   from some abritrary data table with synchronised ID's || already proved that individual users
+#   logging in, get different cookies, stored at their Users table
 
 #Flask variables
 app = Flask(__name__, static_folder="static")
@@ -41,54 +43,78 @@ def selectQuery(value, field):
     try:
         with dbconnection.cursor() as cursor:
             cursor.execute(query)
-            result = cursor.fetchone()
-            return str(result) #make this return some kinda dict maybe ??
+            result = cursor.fetchone() #returns a tuple, iterable much like a list
+            return result
 
     except Exception as e:
         print(e)
 
+#   --> Generate a string 255 characters long consisting of numbers between 0 and 9
+#       at the 50th char, embeds the ID of the authenticated user, returns said cookie as string
+def generateCookie(KEY):
+    cookie = ""
+    #random VALUE generator
+    for i in range(1, 256):
+        n = int(random.random()*10-1)
+        cookie += str(n)
 
-#   --> Generic queries, don't use this function || It's crap
-def queryDB(dbconnection, query):
+    #embed the ID of the user inside the cookie at the 50th char
+    l = list(cookie)
+    l[50] = str(KEY)
+    cookie = "".join(l)
+    return cookie
+
+#   --> takes a database connection and a cookie, returns True if it worked out, False otherwise
+#       Remember, cookies embed their user-ID at the 50th char, hence we don't need to tell
+#       this function, for whom to store this cookie
+def storeCookie(dbconnection, cookie):
     try:
         with dbconnection.cursor() as cursor:
+            query = "UPDATE Users set Cookie=\'{}' WHERE ID=\'{}'"
+            query = query.format(cookie, cookie[50]) #Write a cookie, for the user with ID of [50]
             cursor.execute(query)
             query = cursor.fetchone()
             dbconnection.commit()
-            return query
+            return True
     except Exception as e:
         print(e)
         return False
 
-
+#   --> Takes a KEY and VALUE to store as cookie on the users-browser
+#       Returns the cookie it stored in the user-browser
+#       Useful because we can keep this cookie in memory and compare it every time against theirs
 @app.route("/cookies")
-def cookies(ID):
-    res = make_response(render_template("/index.html")) #preset, so we can mutate it and return
+def cookies(KEY, VALUE):
+    res = make_response(render_template("index.html")) #preset, so we can mutate it and return
     #res.set_cookie("flavor", "Chocolate chip", max_age=10, expires=None, path=request.path,
             #domain=None, secure=False, httponly=False,  samesite=False)
 
-    res.set_cookie("ID", ID) #cookies are like dicts
+    res.set_cookie(KEY, VALUE) #Set the cookie in the users browser
     cookie = request.cookies #retrieve all cookies from user
-    print(cookie.get("ID")) #Get the cookie with a key of ID (cookies are dicts)
-    return res
+    return res, cookie
 
 
 @app.route('/handle_data', methods=['POST'])
 def handle_data():
-    #Retrieve values from forms here
-    input = request.form #input from any form, as multi dict (key query for value)
-    username = selectQuery(input['username'], "Firstname") #query username in the field Firstname
-    passwordHash = generate_password_hash(input['password'])
-    print("\n\n",username, password)
+    #input holds a |username| and |password| value, grab them as keys (input['username'])
+    input = request.form 
+    credentials = selectQuery(input['username'], "Firstname") #if exists, holds credentials
 
-    if input['username'] == username:
-        x = 5 # << this would be a select query 
-        return cookies(str(x)) #You can return cookie functionality without routing there!
-    if input["username"] == 'None': #<< write logic if a query returns False || None
+    #Logic to authenticate a User through firstname | passwordHash
+    if credentials != None:
+        if check_password_hash(credentials[6], input['password']) == True:
+            cookie = generateCookie(credentials[0]) #Generate cookie, ID embedded
+            dbconnection = initConnection('db1', 'password', 'db')
+            x = storeCookie(dbconnection, cookie)
+            print("\n\n\n",x)
+            return cookies("ID",cookie) #You can return cookie functionality without routing there!
+        else:
+            flash('Bad Credentials')
+            return redirect("/")
+
+    elif credentials == None:
         flash('Bad Credentials')
         return redirect("/")
-    else:
-        return render_template('index.html', name='Home')
 
 
 #   --> Home route
@@ -97,8 +123,7 @@ def handle_data():
 def index():
     return render_template('index.html', name='Home')
 
+#   --> Main, run the application in debug mode
 def main():
-    
     app.run(host='192.168.1.11', debug=True)
-
 main()
