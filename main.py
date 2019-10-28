@@ -2,6 +2,7 @@ from werkzeug import *
 from flask import *
 import pymysql
 import random
+import threading
 #-----------------
 import time
 import pdb
@@ -12,19 +13,19 @@ import pdb
 
 
 #UPTOSPEED
-#   I can now authenticate users, when they logged in succesfully, i write a cookie to their
-#   web-storage, and to my database, i should write some logic that, after every action
-#   that requires authentication (maybe looking up data in the database specific to a user)
-#   read the cookie from the web-storage, read the cookie that matches web-storage[50] in my
-#   database, if they both match, the user has proved itself in this websession to be who he says
-#   he is. so look at he web-cookie[50], join that id with whatever data he wants to retrieve
-#   from some abritrary data table with synchronised ID's || already proved that individual users
-#   logging in, get different cookies, stored at their Users table
+#   I can authenticate users by reading their cookies in the global session_variables
+#   This was fun and all but really bad practice and has no use other then to look cool
+#   Should probably write some logic where if a user wants to do an authenticated action,
+#   check their cookie against the one in the database, if true >> gett their data
+#   so basically recreate the authenticate function that is now retarded :-)
+
+
 
 #Flask variables
 app = Flask(__name__, static_folder="static")
 app.secret_key = b'_5#y2L"F4Q8z\n\xec]/'
-
+global session_variables
+session_variables = []
 
 #   --> return a database connection
 def initConnection(user, password, db):
@@ -36,7 +37,7 @@ def initConnection(user, password, db):
         return False
 
 #   --> find a value in a field, in the fixed table Users return the result as a str
-def selectQuery(value, field):
+def selectQuery(field, value):
     dbconnection = initConnection('db1', 'password', 'db')
     query = "SELECT * FROM Users WHERE {}=\'{}'"
     query = query.format(field,value)
@@ -55,7 +56,7 @@ def generateCookie(KEY):
     cookie = ""
     #random VALUE generator
     for i in range(1, 256):
-        n = int(random.random()*10-1)
+        n = int(random.random()*10-1) #fix this to be chars later
         cookie += str(n)
 
     #embed the ID of the user inside the cookie at the 50th char
@@ -84,21 +85,40 @@ def storeCookie(dbconnection, cookie):
 #       Returns the cookie it stored in the user-browser
 #       Useful because we can keep this cookie in memory and compare it every time against theirs
 @app.route("/cookies")
-def cookies(KEY, VALUE):
-    res = make_response(render_template("index.html")) #preset, so we can mutate it and return
+def writeCookie(KEY, VALUE):
+    res = make_response(redirect("/"))
     #res.set_cookie("flavor", "Chocolate chip", max_age=10, expires=None, path=request.path,
             #domain=None, secure=False, httponly=False,  samesite=False)
 
     res.set_cookie(KEY, VALUE) #Set the cookie in the users browser
-    cookie = request.cookies #retrieve all cookies from user
-    return res, cookie
+    #Write the cookie ID and VALUE to the session variables for thread to read
+    session_variables.append(VALUE[50])
+    session_variables.append(VALUE)
+    return res #Route back to the home page
 
+
+#   --> Reads the cookie that's stored in the session_variable, compares it to the one
+#       in the database, if they match, user is authenticated
+#       ||NOTE Not very secure, if the user deletes their cookie AKA logs out,
+#       The session variable won't be updated, they'll be out of sync and this function
+#       will still report AUTHENTICATED, could solve this by making a logout buttonn
+#       That calls for a function to remove the values in session_variables
+#       Reason for this workaround is the fact that threads can't access session based objects
+#       Such as the cookie.requests
+def authenticateUser():
+    while True:
+        if len(session_variables) > 0:
+            dbresult = selectQuery("ID", session_variables[0])
+            if session_variables[1] == dbresult[5]:
+                print("AUTHENTICATED", time.time())
+            time.sleep(3)
+   
 
 @app.route('/handle_data', methods=['POST'])
 def handle_data():
     #input holds a |username| and |password| value, grab them as keys (input['username'])
-    input = request.form 
-    credentials = selectQuery(input['username'], "Firstname") #if exists, holds credentials
+    input = request.form
+    credentials = selectQuery('Firstname', input['username']) #if exists, holds credentials
 
     #Logic to authenticate a User through firstname | passwordHash
     if credentials != None:
@@ -106,8 +126,7 @@ def handle_data():
             cookie = generateCookie(credentials[0]) #Generate cookie, ID embedded
             dbconnection = initConnection('db1', 'password', 'db')
             x = storeCookie(dbconnection, cookie)
-            print("\n\n\n",x)
-            return cookies("ID",cookie) #You can return cookie functionality without routing there!
+            return writeCookie("ID",cookie) #You can return cookie functionality without routing
         else:
             flash('Bad Credentials')
             return redirect("/")
@@ -125,5 +144,13 @@ def index():
 
 #   --> Main, run the application in debug mode
 def main():
+    #   --> Runs authenticateUser in a thread in the background
+    thread_Auth = threading.Thread(target=authenticateUser, args=())
+    thread_Auth.daemon = True
+    thread_Auth.start()
+
+
     app.run(host='192.168.1.11', debug=True)
+
+
 main()
