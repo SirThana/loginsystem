@@ -21,19 +21,22 @@
     <input type="submit" value="Login">
 </form>
 
+<form action="/logout" method="POST">
+    <button name="activeLogout" type="submit">Logout</button>
+</form>
 
-<!--
+
+<!-- SHOW FLASH MESSAGES -->
 {% with messages = get_flashed_messages() %}
   {% if messages %}
     <ul class=flashes>
     {% for message in messages %}
-      <li>{{ message }}</li>
+    <p>{{ message }}</p>
     {% endfor %}
     </ul>
   {% endif %}
 {% endwith %}
 {% block body %}{% endblock %}
--->
 
 <p>{{data}}</p>
 

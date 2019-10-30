@@ -11,21 +11,15 @@ import pdb
 #   1.  Clean up the code, remove uneccesary functions
 #   2.  Make selectQuery returnn a dict instead, easier to parse data from that over a string |Done
 
-
 #UPTOSPEED
-#   I can authenticate users by reading their cookies in the global session_variables
-#   This was fun and all but really bad practice and has no use other then to look cool
-#   Should probably write some logic where if a user wants to do an authenticated action,
-#   check their cookie against the one in the database, if true >> gett their data
-#   so basically recreate the authenticate function that is now retarded :-)
-
-
+#   Make a logout function, should overwrite user cookie with an experation date of the past,
+#   forcing the browser to remove the cookie
 
 #Flask variables
 app = Flask(__name__, static_folder="static")
 app.secret_key = b'_5#y2L"F4Q8z\n\xec]/'
-global session_variables
-session_variables = []
+#global session_variables
+#session_variables = []
 
 #   --> return a database connection
 def initConnection(user, password, db):
@@ -84,16 +78,23 @@ def storeCookie(dbconnection, cookie):
 #   --> Takes a KEY and VALUE to store as cookie on the users-browser
 #       Returns the cookie it stored in the user-browser
 #       Useful because we can keep this cookie in memory and compare it every time against theirs
+#       if expire is set to 0, set a cookie to expire immediately, anything other than 0, session
 @app.route("/cookies")
-def writeCookie(KEY, VALUE):
+def writeCookie(KEY, VALUE, expire):
     res = make_response(redirect("/"))
     #res.set_cookie("flavor", "Chocolate chip", max_age=10, expires=None, path=request.path,
             #domain=None, secure=False, httponly=False,  samesite=False)
 
-    res.set_cookie(KEY, VALUE) #Set the cookie in the users browser
-    #Write the cookie ID and VALUE to the session variables for thread to read
-    session_variables.append(VALUE[50])
-    session_variables.append(VALUE)
+    if expire == 0:
+        res.set_cookie(KEY, VALUE, expires=0) #Set the cookie in the users browser
+        #session_variables.append(VALUE[50])
+        #session_variables.append(VALUE)
+
+    else:
+        res.set_cookie(str(KEY), VALUE) #Set the cookie in the users browser
+        #Write the cookie ID and VALUE to the session variables for thread to read
+        #session_variables.append(VALUE[50])
+        #session_variables.append(VALUE)
     return res #Route back to the home page
 
 
@@ -105,14 +106,37 @@ def writeCookie(KEY, VALUE):
 #       That calls for a function to remove the values in session_variables
 #       Reason for this workaround is the fact that threads can't access session based objects
 #       Such as the cookie.requests
+#def authThread():
+#    while True:
+#        if len(session_variables) > 0:
+#            dbresult = selectQuery("ID", session_variables[0])
+#            try:
+#                if session_variables[1] == dbresult[5]:
+#                    #print("AUTHENTICATED", time.time())
+#                    pass
+#            except:
+#                pass
+#            time.sleep(1)
+  
+
+#   --> Authenticate a user by comparing their cookie, against the one in the database.
+#       If they match, return True, and their ID. We can use the ID to find any other data that
+#       Belongs to the user
 def authenticateUser():
-    while True:
-        if len(session_variables) > 0:
-            dbresult = selectQuery("ID", session_variables[0])
-            if session_variables[1] == dbresult[5]:
-                print("AUTHENTICATED", time.time())
-            time.sleep(3)
-   
+    try: #On first sessions, cookie isn't stored yet, catch exceptions
+        remoteCookie = request.cookies
+        dbCookie = selectQuery('ID', remoteCookie['ID'][50]) #select * from Users ID == cookie[50]
+    except Exception as e:
+        return False, False, 1 #Don't ask, don't tell
+    
+    #dbCookie = selectQuery('ID', remoteCookie['ID'][50])
+    if remoteCookie['ID'] == dbCookie[5]: #Compare remote to db cookie
+        print("AUTHENTICATED USER AT: ", time.time(), " || ", remoteCookie['ID'][50] )
+        credentials = selectQuery("ID", remoteCookie['ID'][50])
+        returnMe = "Logged in as: {} {}".format(credentials[1], credentials[2])
+        return returnMe, True
+    
+    return False
 
 @app.route('/handle_data', methods=['POST'])
 def handle_data():
@@ -125,29 +149,37 @@ def handle_data():
         if check_password_hash(credentials[6], input['password']) == True:
             cookie = generateCookie(credentials[0]) #Generate cookie, ID embedded
             dbconnection = initConnection('db1', 'password', 'db')
-            x = storeCookie(dbconnection, cookie)
-            return writeCookie("ID",cookie) #You can return cookie functionality without routing
+            storeCookie(dbconnection, cookie)
+            return writeCookie("ID",cookie, -1) #write cookie, without routing
         else:
             flash('Bad Credentials')
             return redirect("/")
 
-    elif credentials == None:
+    else:
         flash('Bad Credentials')
         return redirect("/")
 
+@app.route('/logout', methods=['POST'])
+def logout():
+    response = Response()
+    response.delete_cookie("ID")
+    redirect("/")
+    return response
 
 #   --> Home route
 @app.route('/')
 @app.route('/index')
 def index():
+    state = authenticateUser()
+    flash(state[0])
     return render_template('index.html', name='Home')
 
 #   --> Main, run the application in debug mode
 def main():
     #   --> Runs authenticateUser in a thread in the background
-    thread_Auth = threading.Thread(target=authenticateUser, args=())
-    thread_Auth.daemon = True
-    thread_Auth.start()
+    #thread_Auth = threading.Thread(target=authThread, args=())
+    #thread_Auth.daemon = True
+    #thread_Auth.start()
 
 
     app.run(host='192.168.1.11', debug=True)
