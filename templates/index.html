@@ -3,27 +3,37 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-
-  <title>The HTML5 Herald</title>
-  <meta name="description" content="The HTML5 Herald">
-  <meta name="author" content="SitePoint">
-
-  <link rel="stylesheet" href="css/styles.css?v=1.0">
-
+  <title>Philips | CS</title>
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+  <link rel="stylesheet" type="text/css" href="{{url_for('static',filename='styles/styles.css') }}">
 </head>
 
 <body>
 
+  <div id="form">
+    <div id="logintitel">
+        <h2>Philips Client System</h2>
+        <p>Utility Software</p>
+    </div>
+        <div class="form-group">
+          <form action="{{ url_for('handle_data') }}" method="POST">
+            <label for="formGroupExampleInput">IDENTIFICATIE</label>
+            <input type="text" class="form-control" id="formGroupExampleInput" placeholder="192019-XXXXX", name="username">  
+            <label for="exampleInputPassword1">WACHTWOORD</label>
+            <input type="password" class="form-control" id="exampleInputPassword1", name="password">
+            <input type="submit" value="Login" class="btn btn-primary"></input>
+          </form>
 
-<form action="{{ url_for('handle_data') }}" method="POST">
-    <input type="text" name="username">
-    <input type="password" name="password">
-    <input type="submit" value="Login">
-</form>
+            <form action="/logout" method="POST">
+                <button name="activeLogout" type="submit">Logout</button>
+            </form>
 
-<form action="/logout" method="POST">
-    <button name="activeLogout" type="submit">Logout</button>
-</form>
+            <form action="{{ url_for('downloadFile') }}" method="POST">
+                <button name="downloadFile" type="submit">Download</button>
+            </form>
+
+        </div>
+</div>
 
 
 <!-- SHOW FLASH MESSAGES -->
